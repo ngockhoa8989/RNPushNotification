@@ -6,44 +6,52 @@
  * @flow
  */
 
-import React, {Component} from 'react';
-import {Platform, StyleSheet, Text, View} from 'react-native';
+import React, { Component } from 'react';
+import { Provider } from 'react-redux'
+import { createStore, applyMiddleware } from 'redux'
+import createSagaMiddleware from 'redux-saga'
+import allReducers from './src/reducers'
+import rootSaga from './src/sagas/rootSaga'
+import { createLogger } from 'redux-logger'
+import { persistStore } from 'redux-persist'
+import { createReactNavigationReduxMiddleware } from 'react-navigation-redux-helpers'
+import { PersistGate } from 'redux-persist/es/integration/react'
+import NavigationComponent from './src/component/Navigation/NavigationComponent'
 
-const instructions = Platform.select({
-  ios: 'Press Cmd+R to reload,\n' + 'Cmd+D or shake for dev menu',
-  android:
-    'Double tap R on your keyboard to reload,\n' +
-    'Shake or press menu button for dev menu',
-});
+const isDebuggingInChrome = __DEV__ && !!window.navigator.userAgent
 
-type Props = {};
-export default class App extends Component<Props> {
+const navigationMiddleware = createReactNavigationReduxMiddleware(
+  state => state.navigationReducer,
+  'root',
+)
+
+const logger = createLogger({
+  predicate: (getState, action) => isDebuggingInChrome,
+  collapsed: true,
+  duration: true,
+  diff: true,
+})
+
+const sagaMiddleware = createSagaMiddleware()
+
+const store = createStore(allReducers, applyMiddleware(
+  sagaMiddleware,
+  navigationMiddleware,
+  logger
+))
+
+let persistor = persistStore(store)
+
+sagaMiddleware.run(rootSaga)
+
+export default class App extends Component {
   render() {
     return (
-      <View style={styles.container}>
-        <Text style={styles.welcome}>Welcome to React Native!</Text>
-        <Text style={styles.instructions}>To get started, edit App.js</Text>
-        <Text style={styles.instructions}>{instructions}</Text>
-      </View>
-    );
+      <Provider store={store}>
+        <PersistGate persistor={persistor}>
+          <NavigationComponent />
+        </PersistGate>
+      </Provider>
+    )
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF',
-  },
-  welcome: {
-    fontSize: 20,
-    textAlign: 'center',
-    margin: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5,
-  },
-});
